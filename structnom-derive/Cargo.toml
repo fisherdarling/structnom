@@ -1,0 +1,14 @@
+[package]
+name = "structnom-derive"
+version = "0.1.0"
+authors = ["Fisher Darling <fdarlingco@gmail.com>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+nom = "*"
+syn = { version = "*", features = ["derive"] }
+quote = "*"
+proc-macro2 = "*"

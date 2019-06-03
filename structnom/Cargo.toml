@@ -1,0 +1,13 @@
+[package]
+name = "structnom"
+version = "0.1.0"
+authors = ["fisher <fdarlingco@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+structnom-derive = { path = "../structnom-derive" }
+nom = "*"
+
+[[example]]
+name = "basic"
+path = "../examples/basic.rs"
