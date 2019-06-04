@@ -1,4 +1,4 @@
-#![recursion_limit="128"]
+#![recursion_limit = "128"]
 
 extern crate proc_macro;
 
@@ -10,12 +10,18 @@ use quote::{quote, ToTokens};
 use syn::{
     parse2, parse_macro_input, AttrStyle, Attribute, Data, DataEnum, DataStruct, DeriveInput,
     Field, Fields, FieldsNamed, FieldsUnnamed, Generics, Ident, Lit, LitInt, Meta, MetaList,
-    NestedMeta, Variant,
+    NestedMeta, Variant, MetaNameValue,
 };
 
 use proc_macro2::TokenTree;
 
-#[proc_macro_derive(Nom)]
+mod gen_trait;
+
+mod attribute;
+
+use gen_trait::*;
+
+#[proc_macro_derive(StructNom)]
 pub fn nom_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -25,7 +31,7 @@ pub fn nom_derive(input: TokenStream) -> TokenStream {
 
     match input.data {
         Data::Struct(data) => {
-            let expanded = gen_struct_impl(data, generics, name);
+            let expanded = gen_struct_impl(name, &input.attrs, generics, data);
 
             TokenStream::from(expanded)
         }
@@ -38,22 +44,60 @@ pub fn nom_derive(input: TokenStream) -> TokenStream {
     }
 }
 
-fn gen_struct_impl(data: DataStruct, generics: Generics, name: &Ident) -> proc_macro2::TokenStream {
+fn gen_struct_impl( name: &Ident, attrs: &[Attribute], generics: Generics, data: DataStruct) -> proc_macro2::TokenStream {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();;
 
-    let fields = data.fields;
+    let parser = match attrs.get(0) {
 
-    let fields_do_parse = match fields {
-        Fields::Named(ref fields) => gen_named_fields(name, fields),
-        Fields::Unnamed(ref fields) => gen_unnamed_fields(name, fields),
-        Fields::Unit => quote! { Ok((input, Self)) },
-        // _ => panic!("Fields Unnamed"),
+        Some(attr) => {
+            let meta = attr.parse_meta().unwrap();
+
+            let name_value = match meta {
+                // Meta::List(list) => list,
+                Meta::NameValue(nv) => nv,
+                _ => unimplemented!("Enum impl only supports MetaList"),
+            };
+
+            let kind = name_value.ident.to_string();
+            let expanded = match kind.as_ref() {
+                "parser" => {
+                    let func_path = get_path(&attr);
+
+                    quote! {
+                        call!(#func_path)
+                    }
+                }
+                _ => unimplemented!("Unimplemented Attribute"),
+            };
+
+            println!("parser: {}", expanded);
+
+            expanded
+        },
+        None => {
+            let fields = data.fields;
+
+            let fields_do_parse = match fields {
+                Fields::Named(ref fields) => gen_named_fields(name, fields),
+                Fields::Unnamed(ref fields) => gen_unnamed_fields(name, fields),
+                Fields::Unit => quote! { value!(Self) },
+                // _ => panic!("Fields Unnamed"),
+            };
+
+            let expanded = quote! {
+                #fields_do_parse
+            };
+
+            expanded
+        }
     };
 
     let expanded = quote! {
-        impl #impl_generics structnom::Nom for #name #ty_generics #where_clause {
+        impl #impl_generics crate::StructNom for #name #ty_generics #where_clause {
             fn nom(input: &[u8]) -> nom::IResult<&[u8], Self> {
-                let res = #fields_do_parse;
+                let res = do_parse!(input, 
+                            value: #parser >>
+                            (value));
 
                 res
             }
@@ -110,7 +154,7 @@ fn gen_enum_impl(
         .collect();
 
     let expanded = quote! {
-        impl #impl_generics structnom::Nom for #name #ty_generics #where_clause {
+        impl #impl_generics crate::StructNom for #name #ty_generics #where_clause {
             fn nom(input: &[u8]) -> nom::IResult<&[u8], Self> {
                 do_parse!(input,
                 val: switch!(#switch_parser,
@@ -134,9 +178,22 @@ fn get_match_arm(variant: &Variant) -> proc_macro2::TokenStream {
         .expect("Expected attribute for match arm.")
         .clone();
 
+    let range = Ident::new("range", proc_macro2::Span::call_site());
+
+    // // For attributes where the token stream must be used.
+    // if attr.path.is_ident(range) {
+    //     let tokens = &attr.tts;
+
+    //     let expanded = quote! { #tokens };
+
+    //     println!("{}", expanded);
+
+    //     expanded
+    // } else {
+        // For attributes possible with .parse_meta()
     let meta = attr
-        .parse_meta()
-        .expect("Unable to parse attribute metadata in match arm.");
+    .parse_meta()
+    .expect("Unable to parse attribute metadata in match arm.");
 
     let list = match meta {
         Meta::List(list) => list,
@@ -146,12 +203,29 @@ fn get_match_arm(variant: &Variant) -> proc_macro2::TokenStream {
     let kind = list.ident.to_string();
 
     let expanded = match kind.as_ref() {
+        "range" => {
+            let lits = get_int_literals(&list);
+            
+            let start = &lits[0];
+            let end = &lits[1];
+
+            let expanded = quote! {
+                #start ..= #end
+            };
+
+            println!("{}", expanded);
+
+            expanded
+        
+        },
         "byte" => int_once(&list),
         "bytes" => int_slice(&list),
+        "range" => int_range(&list),
         _ => panic!("Match arms must be in the form of #[byte(LitInt)] to match a single byte, or #[bytes(LitInt, LitInt, ...)] to match a slice of integers."),
     };
 
     expanded
+    // }
 }
 
 fn gen_named_fields(name: &Ident, fields: &FieldsNamed) -> proc_macro2::TokenStream {
@@ -166,7 +240,7 @@ fn gen_named_fields(name: &Ident, fields: &FieldsNamed) -> proc_macro2::TokenStr
     let parsers: Vec<_> = fields.named.iter().map(gen_field_parser).collect();
 
     let expanded = quote! {
-        nom::do_parse!(input,
+        do_parse!(
             #(
                 #idents: #parsers >>
             )*
@@ -261,7 +335,7 @@ fn gen_unnamed_fields(name: &Ident, fields: &FieldsUnnamed) -> proc_macro2::Toke
     // println!("Parsers: {:#?}", parsers);
 
     let expanded = quote! {
-        nom::do_parse!(input,
+        do_parse!(
             #(
                 #idents: #parsers >>
             )*
@@ -284,10 +358,22 @@ fn gen_field_parser(field: &Field) -> proc_macro2::TokenStream {
 
         expanded
     } else {
-        let meta = &field.attrs[0].parse_meta().unwrap();
+        let attr = &field.attrs[0];
+        let meta = attr.parse_meta().unwrap();
 
         let parser = match meta {
-            Meta::List(list) => gen_parser_meta_list(list, field),
+            Meta::List(list) => gen_parser_meta_list(&list, field),
+            Meta::NameValue(nv) => {
+                if attr.path.is_ident("parser") {
+                    let func_path = get_path(&attr);
+
+                    quote! {
+                        call!(#func_path)
+                    }
+                } else {
+                    panic!("Unknown identifier for name value")
+                }
+            }
             m => unimplemented!("Meta"),
         };
 
@@ -299,6 +385,20 @@ fn gen_parser_meta_list(list: &MetaList, field: &Field) -> proc_macro2::TokenStr
     let kind: String = list.ident.to_string();
 
     match kind.as_str() {
+        "call" => {
+            let func = get_func_ident(&list);
+            let ty = &field.ty;
+
+            let expanded = quote! {
+                do_parse!(
+                    call!(#func) >>
+                    value: call!(<#ty>::nom) >>
+                    (value)
+                )
+            };
+
+            expanded
+        }
         "tag" => {
             let slice = int_slice(&list);
             let ty = &field.ty;
@@ -313,17 +413,24 @@ fn gen_parser_meta_list(list: &MetaList, field: &Field) -> proc_macro2::TokenStr
 
             expanded
         }
-        "parser" => {
-            let func = get_func_ident(&list);
+        // "parser" => {
+        //     let func = get_func_ident(&list);
 
-            let expanded = quote! {
-                call!(#func)
-            };
+        //     let expanded = quote! {
+        //         call!(#func)
+        //     };
 
-            expanded
-        }
+        //     expanded
+        // }
         _ => unimplemented!("Unimplemented field attribute"),
     }
+}
+
+fn int_range(list: &MetaList) -> proc_macro2::TokenStream {
+    let expanded = quote! { #list };
+    println!("{}", expanded);
+
+    panic!()
 }
 
 fn int_slice(list: &MetaList) -> proc_macro2::TokenStream {
@@ -371,124 +478,53 @@ fn get_func_ident(list: &MetaList) -> Ident {
     }
 }
 
-use syn::parse::{Parse, ParseStream};
+// fn int_range(list: &MetaList) -> Ident {
 
-
-enum Endian {
-    Little,
-    Big,
-}
-
-impl Parse for Endian {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let lookahead = input.lookahead1();
-
-        if lookahead.peek(Ident) {
-            let mut kind = input.parse::<Ident>()?.to_string();
-            kind.make_ascii_lowercase();
-         
-            match kind.as_ref() {
-                "big" => Ok(Endian::Big),
-                "little" => Ok(Endian::Little),
-                _ => panic!("Unsupported Argument"),
-            }
-        } else {
-            Err(lookahead.error())
-        }
-    }
-}
+// }
 
 #[proc_macro]
-pub fn generate_nom_trait(input: TokenStream) -> TokenStream {
+pub fn generate_structnom(input: TokenStream) -> TokenStream {
     let endian = parse_macro_input!(input as Endian);
 
-    let func_prefix = match endian {
-        Endian::Little => quote! {
-            le
-        },
-        Endian::Big => quote! {
-            be
-        }
-    };
+    let byte_impl = gen_byte_impl(endian);
+    let hword_impl = gen_hword_impl(endian);
+    let word_impl = gen_word_impl(endian);
+    let long_impl = gen_long_impl(endian);
+    let float_impl = gen_float_impl(endian);
+    let vec_impl = gen_vec_impl(endian);
+    let option_impl = gen_option_impl();
 
     let expanded = quote! {
-        pub trait Nom {
-            fn nom(input: &[u8]) -> IResult<&[u8], Self>
-                where Self: Sized;
+        pub trait StructNom {
+            fn nom(input: &[u8]) -> nom::IResult<&[u8], Self> where Self: Sized;
         }
 
-        
-
-        impl Nom for u32 {
-            fn nom(input: &[u8]) -> IResult<&[u8], Self> {
-                let (input, res) = #func_prefix_u32(input)?;
-
-                Ok((input, res))
-            }
-        }
-
-        impl<T: Nom> Nom for Vec<T> {
-            fn nom(input: &[u8]) -> IResult<&[u8], Self> {
-                parse_vec(input)
-            }
-        }
-
-        impl<T: Nom> Nom for Option<T> {
-            fn nom(input: &[u8]) -> IResult<&[u8], Self> {
-                opt!(input, complete!(T::nom))
-            }
-        }
-
-        impl Nom for String {
-            fn nom(input: &[u8]) -> IResult<&[u8], Self> {
-                let (input, bytes) = <Vec<u8>>::nom(input)?;
-
-                Ok((input, String::from_utf8(bytes).unwrap()))
-            }
-        }
-
-        pub fn parse_vec<T: Nom>(data: &[u8]) -> IResult<&[u8], Vec<T>> {
-            let (input, length) = #func_prefix_u8(data)?;
-
-            // println!("Parsing vec of length {}", length);
-
-            count!(input, Nom::nom, length as usize)
-        }
+        #byte_impl
+        #hword_impl
+        #word_impl
+        #long_impl
+        #float_impl
+        #vec_impl
+        #option_impl
     };
 
+    println!("StructNom Derivation {}", expanded);
 
     TokenStream::from(expanded)
 }
 
-fn gen_8_impl(endian: Endian) -> proc_macro2::TokenStream {
-    quote!{
-        impl Nom for u8 {
-            fn nom(input: &[u8]) -> IResult<&[u8], Self> {
-                let (input, res) = #func_prefix_u8(input)?;
+fn get_path(attr: &Attribute) -> syn::Path {
 
-                Ok((input, res))
-            }
+    if !attr.path.is_ident("parser") {
+        panic!("Expectred \"parser\"");
+    }
+
+    match attr.parse_meta().expect("Unable to parse attribute") {
+        Meta::NameValue(MetaNameValue { lit: Lit::Str(lit_str), .. }) => {
+            lit_str.parse().expect("Unable to create path from attribute value.")
         }
-    }
-}
-
-fn gen_32_impl(endian: Endian) -> proc_macro2::TokenStream {
-    quote!{
-        
-    }
-}
-fn gen_vec_impl(endian: Endian) -> proc_macro2::TokenStream {
-    quote!{
-        
-    }
-}
-fn gen_opt_impl(endian: Endian) -> proc_macro2::TokenStream {
-    quote!{
-        
-    }
-}
-fn gen_string_impl(endian: Endian) -> proc_macro2::TokenStream {
-    quote!{
-        
+        _ => {
+            panic!("Expected a str literal");
+        }
     }
 }
