@@ -1,12 +1,11 @@
-use syn::{Attribute, Meta};
 use quote::quote;
+use syn::{Attribute, Meta};
 
 use crate::attribute::*;
 // "pre_tag" | "pre_take"
 
-use crate::{int_slice, int_once};
+use crate::{int_once, int_slice};
 // fn int_slice(list: &MetaList) -> proc_macro2::TokenStream {
-
 
 pub fn parse_value(attr: &Attribute) -> proc_macro2::TokenStream {
     let kind = get_path_ident(&attr.path).to_string();
@@ -21,7 +20,7 @@ pub fn parse_value(attr: &Attribute) -> proc_macro2::TokenStream {
             let slice = int_slice(&list);
 
             let expanded = quote! {
-                tag!(&[#(#slice),*])
+                tag!(#slice)
             };
 
             expanded
@@ -35,13 +34,20 @@ pub fn parse_value(attr: &Attribute) -> proc_macro2::TokenStream {
             let int = int_once(&list);
 
             let expanded = quote! {
-                tag!(#int)
+                take!(#int)
             };
 
             expanded
-        },
-        _ => 
+        }
+        "parser" => {
+            let func = get_path(attr);
 
-            // let slice = int_slice
+            let expanded = quote! {
+                call!(#func)
+            };
+
+            expanded
+        }
+        _ => unimplemented!("Unimplemented value attribute"),
     }
 }
