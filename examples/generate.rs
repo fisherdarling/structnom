@@ -6,8 +6,8 @@ extern crate nom;
 #[macro_use]
 extern crate structnom_derive;
 
-use structnom_derive::generate_structnom;
 use nom::le_u8;
+use structnom_derive::generate_structnom;
 
 // use structnom::StructNom;
 
@@ -29,19 +29,32 @@ generate_structnom!(big);
 //     }
 // }
 
+// #[derive(Debug, StructNom)]
+// #[switch(le_u8)]
+// pub enum MyEnum {
+//     #[byte(0x40)]
+//     First { field: u8 }
+// }
+
 #[derive(Debug, StructNom)]
-#[switch(le_u8)]
-pub enum MyEnum {
-    #[byte(0x40)]
-    First { field: u8 }
+pub struct Named {
+    first: u8,
+    another: u8,
 }
 
 #[derive(Debug, StructNom)]
-pub struct Unit {
-    #[pre_tag(0x41)]
-    #[parser = "nom::le_u8"]
-    first: u8
+#[switch(le_u8)]
+pub enum SomeEnum {
+    #[range_start(0x00)]
+    First, // 0
+    Second, // 1
+    #[range_skip] // Skip 2
+    Third, // 3
+    Fourth, // 4
+    #[range_end(0x05)]
+    Fifth, // 5
 }
+
 // pub trait MyMarker {}
 
 // impl<T: StructNom + MyMarker> StructNom for Vec<T> {
@@ -61,9 +74,9 @@ pub struct Unit {
 pub struct Expression(Vec<u8>);
 
 fn main() {
-    let input: &[u8] = &[0x41, 0x55];
+    // let input: &[u8] = &[0x41, 0x55, 0x61];
 
-    let (rest, value) = Unit::nom(input).unwrap();
+    // let (rest, value) = Unit::nom(input).unwrap();
 
-    println!("Value: {:?}", value);
+    // println!("Value: {:?}", value);
 }

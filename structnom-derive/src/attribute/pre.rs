@@ -3,7 +3,7 @@ use syn::Attribute;
 
 use crate::attribute::*;
 
-use crate::{int_once, int_range, int_slice, get_int_literals};
+use crate::{get_int_literals, int_once, int_range, int_slice};
 
 pub fn parse_pre(attr: &Attribute) -> proc_macro2::TokenStream {
     let kind = get_path_ident(&attr.path).to_string();

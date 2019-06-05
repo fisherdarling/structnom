@@ -115,14 +115,14 @@ fn gen_struct_impl(
     expanded
 }
 
-fn gen_match_arms(parsed_attrs: Vec<ParserList>) -> Vec<proc_macro2::TokenStream> {
+fn gen_match_arms(parsed_attrs: &[ParserList]) -> Vec<proc_macro2::TokenStream> {
     let mut state = None;
     let mut skip = false;
 
     let mut ret = Vec::new();
 
     for parsed in parsed_attrs {
-        match parsed.range {
+        match parsed.range.clone() {
             Some(s @ MatchRange::Start(_)) => state.replace(s),
             Some(MatchRange::End(lit)) => {
                 match state {
@@ -134,8 +134,11 @@ fn gen_match_arms(parsed_attrs: Vec<ParserList>) -> Vec<proc_macro2::TokenStream
                 };
 
                 state.replace(MatchRange::End(lit))
-            },
-            Some(MatchRange::Skip) => {skip = true; None},
+            }
+            Some(MatchRange::Skip) => {
+                skip = true;
+                None
+            }
             None => None,
         };
 
@@ -157,28 +160,27 @@ fn gen_match_arms(parsed_attrs: Vec<ParserList>) -> Vec<proc_macro2::TokenStream
                 let new_lit = LitInt::new(lit.value() + 1, lit.suffix(), lit.span());
 
                 Some(MatchRange::Start(new_lit))
-            },
+            }
             Some(MatchRange::End(lit)) => {
                 arm = quote! {
                     #lit
                 };
 
                 None
-            },
+            }
             None => {
                 arm = parsed.match_arm.clone().unwrap();
 
                 None
-            },
-            _ => unreachable!("State should never be skip.")
+            }
+            _ => unreachable!("State should never be skip."),
         };
 
         println!("Generated Arm: {}", arm);
 
         ret.push(arm);
     }
-    
-    
+
     ret
 }
 
@@ -216,20 +218,29 @@ fn gen_enum_impl(
         .map(ParserList::from_attributes)
         .collect();
 
-    let match_arms = gen_match_arms(attr_parsers);    
+    let match_arms = gen_match_arms(&attr_parsers);
 
     let variant_parsers: Vec<_> = data
         .variants
         .iter()
-        .map(|variant| match variant.fields {
-            Fields::Named(ref named) => gen_enum_named_fields(name, &variant, named),
-            Fields::Unnamed(ref unnamed) => gen_enum_unnamed_fields(name, &variant, unnamed),
-            Fields::Unit => {
-                // println!("Unit Variant Field");
-                let var_ident = &variant.ident;
+        .zip(attr_parsers.iter())
+        .map(|(variant, parsed)| {
+            if let Some(ref parser) = parsed.value {
+                parser.clone()
+            } else {
+                match variant.fields {
+                    Fields::Named(ref named) => gen_enum_named_fields(name, &variant, named),
+                    Fields::Unnamed(ref unnamed) => {
+                        gen_enum_unnamed_fields(name, &variant, unnamed)
+                    }
+                    Fields::Unit => {
+                        // println!("Unit Variant Field");
+                        let var_ident = &variant.ident;
 
-                quote! {
-                    value!(#name::#var_ident)
+                        quote! {
+                            value!(#name::#var_ident)
+                        }
+                    }
                 }
             }
         })
@@ -255,7 +266,7 @@ fn gen_enum_impl(
 
 fn gen_named_fields(name: &Ident, fields: &FieldsNamed) -> proc_macro2::TokenStream {
     let mut attrs = Vec::new();
-    
+
     let idents: Vec<_> = fields
         .named
         .iter()
@@ -268,7 +279,12 @@ fn gen_named_fields(name: &Ident, fields: &FieldsNamed) -> proc_macro2::TokenStr
 
     // let types: Vec<_> = fields.named.iter().map(|f| f.ty.clone()).collect();
     // let parsers: Vec<_> = fields.named.iter().map(gen_field_parser).collect();
-    let parsers: Vec<_> = fields.named.iter().zip(attrs.into_iter()).map(|(f, a)| named_field(f, a)).collect();
+    let parsers: Vec<_> = fields
+        .named
+        .iter()
+        .zip(attrs.into_iter())
+        .map(|(f, a)| named_field(f, a))
+        .collect();
 
     let expanded = quote! {
         do_parse!(

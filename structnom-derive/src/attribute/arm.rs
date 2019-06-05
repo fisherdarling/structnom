@@ -3,7 +3,7 @@ use syn::{Attribute, Meta};
 
 use crate::attribute::*;
 
-use crate::{int_once, int_range, int_slice, get_int_literals};
+use crate::{get_int_literals, int_once, int_range, int_slice};
 // fn int_slice(list: &MetaList) -> proc_macro2::TokenStream {
 
 // "range" | "byte" | "bytes" => self.parse_arm(attr),
@@ -20,7 +20,7 @@ pub fn parse_arm(attr: &Attribute) -> proc_macro2::TokenStream {
         "bytes" => int_slice(&list),
         "range" => {
             let lits = get_int_literals(&list);
-            
+
             let start = &lits[0];
             let end = &lits[1];
 
@@ -31,7 +31,7 @@ pub fn parse_arm(attr: &Attribute) -> proc_macro2::TokenStream {
             // println!("{}", expanded);
 
             expanded
-        },
+        }
         _ => unimplemented!("Unimplemented match arm"),
     }
 }
