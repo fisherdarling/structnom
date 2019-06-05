@@ -6,14 +6,25 @@ pub mod value;
 use proc_macro2::TokenStream as Tokens;
 
 use quote::quote;
-use syn::{Attribute, Ident, Lit, Meta, MetaNameValue};
+use syn::{Attribute, Ident, Lit, Meta, MetaNameValue, LitInt};
 
-#[derive(Debug, Default)]
+use crate::get_int_literals;
+// fn get_int_literals(list: &MetaList) -> Vec<syn::LitInt> {
+
+#[derive(Clone)]
+pub enum MatchRange {
+    Start(LitInt),
+    End(LitInt),
+    Skip,
+}
+
+#[derive(Default)]
 pub struct ParserList {
     pub(crate) pre: Vec<Tokens>,
     pub(crate) match_arm: Option<Tokens>,
     pub(crate) value: Option<Tokens>,
     pub(crate) post: Vec<Tokens>,
+    pub(crate) range: Option<MatchRange>,
 }
 
 impl ParserList {
@@ -49,6 +60,29 @@ impl ParserList {
         self.value.replace(parser);
     }
 
+    fn parse_range(&mut self, attr: &Attribute) {
+        let meta = attr.parse_meta().expect("Unable to parse range metadata.");
+        let kind = get_path_ident(&attr.path).to_string();
+
+        match meta {
+            Meta::List(list) => {
+                let lit = get_int_literals(&list).get(0).expect("Expected an integer literal for range_start or range_end").clone();
+
+                match kind.as_ref() {
+                    "range_start" => self.range.replace(MatchRange::Start(lit)),
+                    "range_end" => self.range.replace(MatchRange::End(lit)),
+                    _ => panic!("Unexpected range kind"),
+                };
+            }
+            Meta::Word(word) => {
+                if kind == "range_skip" {
+                    self.range.replace(MatchRange::Skip);
+                }   
+            }
+            _ => panic!("Expected meta list."),
+        };
+    }
+
     pub fn parse_attributes(&mut self, attrs: &[Attribute]) {
         for attr in attrs {
             let kind = get_path_ident(&attr.path).to_string();
@@ -60,6 +94,7 @@ impl ParserList {
                 "range" | "byte" | "bytes" => self.parse_arm(attr),
                 "parser" | "tag" | "take" => self.parse_value(attr),
                 "debug" => self.parse_post(attr),
+                "range_start" | "range_end" | "range_skip" => self.parse_range(attr),
                 _ => unimplemented!("Unimplemented StructNom parser"),
             }
         }
