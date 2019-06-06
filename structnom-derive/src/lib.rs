@@ -246,21 +246,25 @@ fn gen_enum_impl(
         })
         .collect();
 
-    let pre_parsers: Vec<proc_macro2::TokenStream> = attr_parsers.iter().map(|p| {
-        let tokens = &p.pre;
-        quote! {
-            #(#tokens >>)*
-        }
-    }).collect();
+    let pre_parsers: Vec<proc_macro2::TokenStream> = attr_parsers
+        .iter()
+        .map(|p| {
+            let tokens = &p.pre;
+            quote! {
+                #(#tokens >>)*
+            }
+        })
+        .collect();
 
-    let post_parsers: Vec<proc_macro2::TokenStream> = attr_parsers.iter().map(|p| {
-        let tokens = &p.post;
-        quote! {
-            #(#tokens >>)*
-        }
-    }).collect();
-
-
+    let post_parsers: Vec<proc_macro2::TokenStream> = attr_parsers
+        .iter()
+        .map(|p| {
+            let tokens = &p.post;
+            quote! {
+                #(#tokens >>)*
+            }
+        })
+        .collect();
 
     let expanded = quote! {
         impl #impl_generics crate::StructNom for #name #ty_generics #where_clause {

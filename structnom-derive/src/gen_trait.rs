@@ -82,9 +82,9 @@ pub fn gen_vec_impl(endian: Endian) -> proc_macro2::TokenStream {
         impl<T: StructNom> StructNom for Vec<T> {
             default fn nom(input: &[u8]) -> nom::IResult<&[u8], Self> {
                 let (input, length) = nom::#func(input)?;
-                
+
                 // log::debug!("Vec Length: {}", length);
-                
+
                 let (input, res) = count!(input, T::nom, length as usize)?;
 
                 Ok((input, res))

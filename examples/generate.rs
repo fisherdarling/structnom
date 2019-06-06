@@ -53,7 +53,6 @@ pub enum SomeEnum {
     Fourth, // 4
     #[range_end(0x05)]
     Fifth, // 5
-
 }
 
 // pub trait MyMarker {}
