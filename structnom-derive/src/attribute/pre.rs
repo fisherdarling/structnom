@@ -26,7 +26,7 @@ pub fn parse_pre(attr: &Attribute) -> proc_macro2::TokenStream {
         "pre_take" => {
             let list = match attr.parse_meta().unwrap() {
                 Meta::List(l) => l,
-                _ => unimplemented!("Expected a list of arguments for `pre_tag`"),
+                _ => unimplemented!("Expected a list of arguments for `pre_take`"),
             };
 
             let int = int_once(&list);

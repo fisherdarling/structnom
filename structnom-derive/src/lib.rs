@@ -76,7 +76,7 @@ fn gen_struct_impl(
                 _ => unimplemented!("Unimplemented Attribute"),
             };
 
-            // println!("parser: {}", expanded);
+            // log::debug!("parser: {}", expanded);
 
             expanded
         }
@@ -110,7 +110,7 @@ fn gen_struct_impl(
         }
     };
 
-    // println!("Gen Struct Impl {}", expanded);
+    // log::debug!("Gen Struct Impl {}", expanded);
 
     expanded
 }
@@ -128,7 +128,7 @@ fn gen_match_arms(parsed_attrs: &[ParserList]) -> Vec<proc_macro2::TokenStream> 
                 match state {
                     Some(MatchRange::Start(ref should_be)) => {
                         assert_eq!(should_be.value(), lit.value());
-                        println!("Equal Assert");
+                        log::debug!("Equal Assert");
                     }
                     _ => panic!("range_end must be preceded by range_start"),
                 };
@@ -176,7 +176,7 @@ fn gen_match_arms(parsed_attrs: &[ParserList]) -> Vec<proc_macro2::TokenStream> 
             _ => unreachable!("State should never be skip."),
         };
 
-        println!("Generated Arm: {}", arm);
+        log::debug!("Generated Arm: {}", arm);
 
         ret.push(arm);
     }
@@ -203,11 +203,11 @@ fn gen_enum_impl(
 
     let kind = list.ident.to_string();
 
-    // println!("Enum Attr Kind: {}", kind);
+    // log::debug!("Enum Attr Kind: {}", kind);
 
     let switch_parser = get_func_ident(&list);
 
-    // println!("Switch Parser: {}", switch_parser.to_string());
+    // log::debug!("Switch Parser: {}", switch_parser.to_string());
 
     // let match_arms: Vec<_> = data.variants.iter().map(get_match_arm).collect();
 
@@ -234,7 +234,7 @@ fn gen_enum_impl(
                         gen_enum_unnamed_fields(name, &variant, unnamed)
                     }
                     Fields::Unit => {
-                        // println!("Unit Variant Field");
+                        // log::debug!("Unit Variant Field");
                         let var_ident = &variant.ident;
 
                         quote! {
@@ -246,20 +246,40 @@ fn gen_enum_impl(
         })
         .collect();
 
+    let pre_parsers: Vec<proc_macro2::TokenStream> = attr_parsers.iter().map(|p| {
+        let tokens = &p.pre;
+        quote! {
+            #(#tokens >>)*
+        }
+    }).collect();
+
+    let post_parsers: Vec<proc_macro2::TokenStream> = attr_parsers.iter().map(|p| {
+        let tokens = &p.post;
+        quote! {
+            #(#tokens >>)*
+        }
+    }).collect();
+
+
+
     let expanded = quote! {
         impl #impl_generics crate::StructNom for #name #ty_generics #where_clause {
             fn nom(input: &[u8]) -> nom::IResult<&[u8], Self> {
                 do_parse!(input,
                 val: switch!(#switch_parser,
-                        #(#match_arms => #variant_parsers)|*
+                        #(#match_arms => do_parse!(
+                            #(#pre_parsers)*
+                            value: #variant_parsers >>
+                            #(#post_parsers)*
+                            (value)
+                        ))|*
                     ) >>
-                    (val)
-                )
+                    (val))
             }
         }
     };
 
-    println!("Generated Enum: {}", expanded);
+    log::debug!("Generated Enum: {}", expanded);
 
     expanded
 }
@@ -314,7 +334,7 @@ fn named_field(field: &Field, mut attrs: ParserList) -> proc_macro2::TokenStream
         )
     };
 
-    println!("Named Field: {}", expanded);
+    log::debug!("Named Field: {}", expanded);
 
     expanded
 }
@@ -369,7 +389,7 @@ fn gen_enum_unnamed_fields(
 
     let parsers: Vec<_> = fields.unnamed.iter().map(gen_field_parser).collect();
 
-    // println!("Parsers: {:#?}", parsers);
+    // log::debug!("Parsers: {:#?}", parsers);
 
     let expanded = quote! {
         do_parse!(
@@ -380,7 +400,7 @@ fn gen_enum_unnamed_fields(
         )
     };
 
-    // println!("Expanded: {}", expanded);
+    // log::debug!("Expanded: {}", expanded);
 
     expanded
 }
@@ -400,7 +420,7 @@ fn gen_unnamed_fields(name: &Ident, fields: &FieldsUnnamed) -> proc_macro2::Toke
 
     let parsers: Vec<_> = fields.unnamed.iter().map(gen_field_parser).collect();
 
-    // println!("Parsers: {:#?}", parsers);
+    // log::debug!("Parsers: {:#?}", parsers);
 
     let expanded = quote! {
         do_parse!(
@@ -411,7 +431,7 @@ fn gen_unnamed_fields(name: &Ident, fields: &FieldsUnnamed) -> proc_macro2::Toke
         )
     };
 
-    // println!("Expanded: {}", expanded);
+    // log::debug!("Expanded: {}", expanded);
 
     expanded
 }
@@ -496,7 +516,7 @@ fn gen_parser_meta_list(list: &MetaList, field: &Field) -> proc_macro2::TokenStr
 
 fn int_range(list: &MetaList) -> proc_macro2::TokenStream {
     let expanded = quote! { #list };
-    // println!("{}", expanded);
+    // log::debug!("{}", expanded);
 
     panic!()
 }
@@ -576,7 +596,7 @@ pub fn generate_structnom(input: TokenStream) -> TokenStream {
         #option_impl
     };
 
-    // println!("StructNom Derivation {}", expanded);
+    // log::debug!("StructNom Derivation {}", expanded);
 
     TokenStream::from(expanded)
 }

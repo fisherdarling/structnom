@@ -28,7 +28,7 @@ pub fn parse_arm(attr: &Attribute) -> proc_macro2::TokenStream {
                 #start ..= #end
             };
 
-            // println!("{}", expanded);
+            // log::debug!("{}", expanded);
 
             expanded
         }

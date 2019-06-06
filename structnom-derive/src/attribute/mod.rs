@@ -6,7 +6,7 @@ pub mod value;
 use proc_macro2::TokenStream as Tokens;
 
 use quote::quote;
-use syn::{Attribute, Ident, Lit, LitInt, Meta, MetaNameValue};
+use syn::{Attribute, Ident, Lit, Meta, MetaNameValue, LitInt};
 
 use crate::get_int_literals;
 // fn get_int_literals(list: &MetaList) -> Vec<syn::LitInt> {
@@ -66,10 +66,7 @@ impl ParserList {
 
         match meta {
             Meta::List(list) => {
-                let lit = get_int_literals(&list)
-                    .get(0)
-                    .expect("Expected an integer literal for range_start or range_end")
-                    .clone();
+                let lit = get_int_literals(&list).get(0).expect("Expected an integer literal for range_start or range_end").clone();
 
                 match kind.as_ref() {
                     "range_start" => self.range.replace(MatchRange::Start(lit)),
@@ -80,7 +77,7 @@ impl ParserList {
             Meta::Word(word) => {
                 if kind == "range_skip" {
                     self.range.replace(MatchRange::Skip);
-                }
+                }   
             }
             _ => panic!("Expected meta list."),
         };

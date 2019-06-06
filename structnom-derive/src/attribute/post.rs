@@ -14,7 +14,7 @@ pub fn parse_post(attr: &Attribute) -> proc_macro2::TokenStream {
     match word.as_ref() {
         "debug" => {
             let expanded = quote! {
-                value!(println!("{:?}", value))
+                value!(log::debug!("{:?}", value))
             };
 
             expanded

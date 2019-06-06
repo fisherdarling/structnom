@@ -53,6 +53,7 @@ pub enum SomeEnum {
     Fourth, // 4
     #[range_end(0x05)]
     Fifth, // 5
+
 }
 
 // pub trait MyMarker {}
@@ -78,5 +79,5 @@ fn main() {
 
     // let (rest, value) = Unit::nom(input).unwrap();
 
-    // println!("Value: {:?}", value);
+    // log::debug!("Value: {:?}", value);
 }

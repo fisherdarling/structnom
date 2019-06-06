@@ -16,3 +16,4 @@ nom = "*"
 syn = { version = "*", features = ["derive"] }
 quote = "*"
 proc-macro2 = "*"
+log = "*"
