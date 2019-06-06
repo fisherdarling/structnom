@@ -13,7 +13,7 @@ path = "../examples/generate.rs"
 
 [dependencies]
 nom = "*"
-syn = { version = "*", features = ["derive"] }
+syn = { version = "*", features = ["derive", "extra-traits"] }
 quote = "*"
 proc-macro2 = "*"
 log = "*"

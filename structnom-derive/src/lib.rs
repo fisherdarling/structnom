@@ -17,6 +17,8 @@ use proc_macro2::TokenTree;
 
 mod gen_trait;
 
+mod gen;
+mod attr;
 mod attribute;
 
 use attribute::*;
