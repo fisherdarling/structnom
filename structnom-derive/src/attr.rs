@@ -3,9 +3,10 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse::{Lookahead1, Parse, ParseBuffer, ParseStream, Peek};
-use syn::{parenthesized, punctuated::Punctuated, Attribute, LitInt, LitStr, Meta, Token, token::Token};
+use syn::{
+    parenthesized, punctuated::Punctuated, token::Token, Attribute, LitInt, LitStr, Meta, Token,
+};
 // use syn::lookahead::TokenMarker;
-
 
 use syn::Result as SynResult;
 
@@ -15,6 +16,16 @@ pub enum SnomArg {
     Parser(ParserArg),
     Effect(EffectArg),
     None,
+}
+
+impl SnomArg {
+    pub fn parse(attr: Attribute) -> SynResult<Option<Self>> {
+        if is_structnom_attr(&attr) {
+            Ok(Some(syn::parse2::<SnomArg>(attr.tts)?))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 impl Parse for SnomArg {
@@ -45,7 +56,6 @@ impl Parse for SnomArg {
         } else {
             Ok(SnomArg::None)
         }
-
     }
 }
 
@@ -73,7 +83,7 @@ pub enum MatchArg {
         values_token: kw::values,
         paren_token: syn::token::Paren,
         values: Punctuated<LitInt, Token![,]>,
-    },   
+    },
 }
 
 impl Parse for MatchArg {
@@ -248,7 +258,7 @@ mod kw {
 //     Right(B),
 // }
 
-// impl<A, B> Parse for Either<A, B> 
+// impl<A, B> Parse for Either<A, B>
 // where
 //     A: Token + Parse,
 //     B: Token + Parse
@@ -309,19 +319,19 @@ mod tests {
     use super::*;
     use quote::quote;
     use syn::parse2;
-    use syn::{Attribute, parse_quote};
+    use syn::{parse_quote, Attribute};
 
     #[test]
     fn range_start() {
         let attr: Attribute = parse_quote! { #[snom(range(start = 1))] };
         // assert!(is_structnom_attr(&attr));
-        let snom_arg = parse2::<SnomArg>(attr.tts).unwrap(); 
+        let snom_arg = parse2::<SnomArg>(attr.tts).unwrap();
     }
 
     #[test]
     fn range_end() {
         let attr: Attribute = parse_quote! { #[snom(range(end = 1))] };
-        let snom_arg = parse2::<SnomArg>(attr.tts).unwrap(); 
+        let snom_arg = parse2::<SnomArg>(attr.tts).unwrap();
     }
 
     #[test]
@@ -330,7 +340,7 @@ mod tests {
         let snom_arg = parse2::<SnomArg>(attr_1.tts).unwrap();
 
         let attr_2: Attribute = parse_quote! { #[snom(range(skip = 5))] };
-        let snom_arg = parse2::<SnomArg>(attr_2.tts).unwrap(); 
+        let snom_arg = parse2::<SnomArg>(attr_2.tts).unwrap();
     }
 
     #[test]
