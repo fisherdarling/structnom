@@ -21,32 +21,65 @@ mod attr;
 mod attribute;
 mod gen;
 
+use gen::*;
+
 use attribute::*;
 
 use gen_trait::*;
 
-#[proc_macro_derive(StructNom)]
+#[proc_macro_derive(StructNom, attributes(snom))]
 pub fn nom_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    let name = &input.ident;
+    let name = input.ident;
     // let attrs = &input.attrs;
     let generics = input.generics;
 
     match input.data {
         Data::Struct(data) => {
-            let expanded = gen_struct_impl(name, &input.attrs, generics, data);
+            let mut gen = StructGen::new(name, input.attrs, generics, data);
+            let expanded = gen.gen_impl();
+
+            println!("{}", expanded);
 
             TokenStream::from(expanded)
         }
         Data::Enum(data) => {
-            let expanded = gen_enum_impl(name, &input.attrs, generics, data);
+            let mut generator = EnumGen::new(name.clone(), input.attrs, generics, data);
+            let expanded = generator.gen_impl();
+            
+            println!("{}", expanded);
 
             TokenStream::from(expanded)
         }
         Data::Union(_) => panic!("Union types are not supported yet."),
     }
 }
+
+// #[proc_macro_derive(StructNom)]
+// pub fn nom_derive(input: TokenStream) -> TokenStream {
+//     let input = parse_macro_input!(input as DeriveInput);
+
+//     let name = &input.ident;
+//     // let attrs = &input.attrs;
+//     let generics = input.generics;
+
+//     match input.data {
+//         Data::Struct(data) => {
+//             let expanded = gen_struct_impl(name, &input.attrs, generics, data);
+
+//             TokenStream::from(expanded)
+//         }
+//         Data::Enum(data) => {
+//             let mut generator = EnumGen::new(name.clone(), input.attrs, generics, data);
+
+//             let expanded = generator.gen_impl();
+
+//             TokenStream::from(expanded)
+//         }
+//         Data::Union(_) => panic!("Union types are not supported yet."),
+//     }
+// }
 
 fn gen_struct_impl(
     name: &Ident,

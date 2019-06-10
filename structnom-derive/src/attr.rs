@@ -1,7 +1,7 @@
 //! Parsing logic for StructNom attributes.
 
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens, TokenStreamExt};
 use syn::parse::{Lookahead1, Parse, ParseBuffer, ParseStream, Peek};
 use syn::{
     parenthesized, punctuated::Punctuated, token::Token, Attribute, LitInt, LitStr, Meta, Token,
@@ -10,20 +10,51 @@ use syn::{
 
 use syn::Result as SynResult;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SnomArg {
     Match(MatchArg),
-    Parser(ParserArg),
+    Parser(ValueArg),
     Effect(EffectArg),
     None,
 }
 
 impl SnomArg {
-    pub fn parse(attr: Attribute) -> SynResult<Option<Self>> {
-        if is_structnom_attr(&attr) {
-            Ok(Some(syn::parse2::<SnomArg>(attr.tts)?))
+    pub fn parse(attr: &Attribute) -> SynResult<Option<Self>> {
+        // println!("SnomArg parse: {:?}", attr);
+
+        if is_structnom_attr(attr) {
+            // println!("Is Snom Attr");
+
+            let parsed = syn::parse2::<SnomArg>(attr.tts.clone());
+            // println!("Parsed Attr: {:?}", parsed);
+
+            Ok(Some(parsed?))
         } else {
             Ok(None)
+        }
+    }
+
+    pub fn match_arg(&self) -> Option<&MatchArg> {
+        if let SnomArg::Match(ref a) = self {
+            Some(a)
+        } else {
+            None
+        }
+    }
+
+    pub fn value_arg(&self) -> Option<&ValueArg> {
+        if let SnomArg::Parser(ref a) = self {
+            Some(a)
+        } else {
+            None
+        }
+    }
+
+    pub fn effect_arg(&self) -> Option<&EffectArg> {
+        if let SnomArg::Effect(ref a) = self {
+            Some(a)
+        } else {
+            None
         }
     }
 }
@@ -42,6 +73,8 @@ impl Parse for SnomArg {
         // let content;
         // parenthesized!(content in input);
         let input = pop_parens(input)?;
+
+        // println!("SnomArg Input: {:?}", input);
 
         let lookahead = input.lookahead1();
 
@@ -64,14 +97,17 @@ pub fn looking_at_match(lookahead: &Lookahead1) -> bool {
 }
 
 pub fn looking_at_parser(lookahead: &Lookahead1) -> bool {
-    lookahead.peek(kw::parser) || lookahead.peek(kw::skip) || lookahead.peek(kw::iter)
+    lookahead.peek(kw::parser)
+        || lookahead.peek(kw::skip)
+        || lookahead.peek(kw::iter)
+        || lookahead.peek(kw::switch)
 }
 
 pub fn looking_at_effect(lookahead: &Lookahead1) -> bool {
-    lookahead.peek(kw::debug)
+    lookahead.peek(kw::debug) || lookahead.peek(kw::tag)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MatchArg {
     Range(RangeArg),
     Val {
@@ -115,7 +151,7 @@ impl Parse for MatchArg {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RangeArg {
     Start {
         start_token: kw::start,
@@ -164,12 +200,12 @@ impl Parse for RangeArg {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum ParserArg {
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValueArg {
     Parser {
         parser_token: kw::parser,
         eq_token: Token![=],
-        value: LitStr,
+        value: syn::Path,
     },
     Skip {
         skip_token: kw::skip,
@@ -177,25 +213,38 @@ pub enum ParserArg {
     Iter {
         iter_token: kw::iter,
     },
+    Switch {
+        switch_token: kw::switch,
+        eq_token: Token![=],
+        value: syn::Path,
+    },
 }
 
-impl Parse for ParserArg {
+impl Parse for ValueArg {
     fn parse(input: ParseStream) -> SynResult<Self> {
         let lookahead = input.lookahead1();
 
+        // println!("ValueArg Input: {:?}", input);
+
         if lookahead.peek(kw::parser) {
-            Ok(ParserArg::Parser {
+            Ok(ValueArg::Parser {
                 parser_token: input.parse()?,
                 eq_token: input.parse()?,
                 value: input.parse()?,
             })
         } else if lookahead.peek(kw::skip) {
-            Ok(ParserArg::Skip {
+            Ok(ValueArg::Skip {
                 skip_token: input.parse()?,
             })
         } else if lookahead.peek(kw::iter) {
-            Ok(ParserArg::Iter {
+            Ok(ValueArg::Iter {
                 iter_token: input.parse()?,
+            })
+        } else if lookahead.peek(kw::switch) {
+            Ok(ValueArg::Switch {
+                switch_token: input.parse()?,
+                eq_token: input.parse()?,
+                value: input.parse()?,
             })
         } else {
             Err(lookahead.error())
@@ -203,8 +252,13 @@ impl Parse for ParserArg {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum EffectArg {
+    Tag {
+        tag_token: kw::tag,
+        paren_token: syn::token::Paren,
+        value: TagEither,
+    },
     Debug {
         debug_token: kw::debug,
         eq_token: Option<Token![=]>,
@@ -214,11 +268,40 @@ pub enum EffectArg {
 
 impl Parse for EffectArg {
     fn parse(input: ParseStream) -> SynResult<Self> {
-        Ok(EffectArg::Debug {
-            debug_token: input.parse()?,
-            eq_token: input.parse()?,
-            value: input.parse()?,
-        })
+        let lookahead = input.lookahead1();
+
+        if lookahead.peek(kw::tag) {
+            let content;
+            Ok(EffectArg::Tag {
+                tag_token: input.parse()?,
+                paren_token: parenthesized!(content in input),
+                value: content.parse()?,
+            })
+        } else if lookahead.peek(kw::debug) {
+            Ok(EffectArg::Debug {
+                debug_token: input.parse()?,
+                eq_token: input.parse()?,
+                value: input.parse()?,
+            })
+        } else {
+            Err(lookahead.error())
+        }
+    }
+}
+
+impl ToTokens for EffectArg {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let repr = match self {
+            EffectArg::Tag { value, .. } => match value {
+                TagEither::Slice(ident) => quote! { tag!(#ident) },
+                TagEither::Values(vals) => quote! { tag!(&[#(#vals),*]) },
+            },
+            EffectArg::Debug { value, .. } => {
+                quote! { compile_error!("Debug is not yet implemented.") }
+            }
+        };
+
+        tokens.extend(repr);
     }
 }
 
@@ -245,12 +328,34 @@ mod kw {
     custom_keyword!(val);
     custom_keyword!(values);
     custom_keyword!(slice);
-
+    custom_keyword!(switch);
     custom_keyword!(parser);
     custom_keyword!(iter);
     // custom_keyword!(complete);
 
+    custom_keyword!(tag);
+    custom_keyword!(take);
     custom_keyword!(debug);
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TagEither {
+    Slice(syn::Ident),
+    Values(Punctuated<LitInt, Token![,]>),
+}
+
+impl Parse for TagEither {
+    fn parse(input: ParseStream) -> SynResult<Self> {
+        let lookahead = input.lookahead1();
+
+        if lookahead.peek(syn::Ident) {
+            Ok(TagEither::Slice(input.parse()?))
+        } else if lookahead.peek(LitInt) {
+            Ok(TagEither::Values(input.parse_terminated(LitInt::parse)?))
+        } else {
+            Err(lookahead.error())
+        }
+    }
 }
 
 // pub enum Either<A: Parse + Token + Peek, B: Parse + Token + Peek> {
