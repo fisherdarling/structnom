@@ -11,9 +11,13 @@ proc-macro = true
 name = "generate"
 path = "../examples/generate.rs"
 
+[[example]]
+name = "ipv4header"
+path = "./examples/ipv4header.rs"
+
 [dependencies]
 nom = "*"
-syn = { version = "*", features = ["derive", "extra-traits"] }
+syn = { version = "*", features = ["derive", "extra-traits", "full"] }
 quote = "*"
 proc-macro2 = "*"
 log = "*"

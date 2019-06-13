@@ -81,30 +81,23 @@ impl Parse for SnomArg {
         // println!("SnomArg: input {:#?}", input);
 
         if looking_at_match(&lookahead) {
+            // println!("Looking At: {}", "match");
+            
             Ok(SnomArg::Match(input.parse()?))
         } else if looking_at_parser(&lookahead) {
+            // println!("Looking At: {}", "parser");
+            
             Ok(SnomArg::Parser(input.parse()?))
         } else if looking_at_effect(&lookahead) {
+            // println!("Looking At: {}", "effect");
+            
             Ok(SnomArg::Effect(input.parse()?))
         } else {
+            // println!("Looking At: {}", "none");
+            
             Ok(SnomArg::None)
         }
     }
-}
-
-pub fn looking_at_match(lookahead: &Lookahead1) -> bool {
-    lookahead.peek(kw::range) || lookahead.peek(kw::val) || lookahead.peek(kw::values)
-}
-
-pub fn looking_at_parser(lookahead: &Lookahead1) -> bool {
-    lookahead.peek(kw::parser)
-        || lookahead.peek(kw::skip)
-        || lookahead.peek(kw::iter)
-        || lookahead.peek(kw::switch)
-}
-
-pub fn looking_at_effect(lookahead: &Lookahead1) -> bool {
-    lookahead.peek(kw::debug) || lookahead.peek(kw::tag)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -207,6 +200,18 @@ pub enum ValueArg {
         eq_token: Token![=],
         value: syn::Path,
     },
+    Bits {
+        bits_token: kw::bits,
+        parens_token: syn::token::Paren,
+        count: LitInt,
+    },
+    TagBits {
+        bits_token: kw::bits,
+        parens_token: syn::token::Paren,
+        count: LitInt,
+        comma_token: Token![,],
+        pattern: syn::Pat,
+    },
     Skip {
         skip_token: kw::skip,
     },
@@ -246,6 +251,41 @@ impl Parse for ValueArg {
                 eq_token: input.parse()?,
                 value: input.parse()?,
             })
+        } else if lookahead.peek(kw::bits) {
+            let content;
+
+            let bits_token: kw::bits = input.parse()?;
+            let parens_token: syn::token::Paren = parenthesized!(content in input);
+            let count: LitInt = content.parse()?;
+
+            // println!("*** Lookahead ***", content.look)
+
+            if content.peek(Token![,]) {
+                let comma_token: Token![,] = content.parse()?;
+                let pattern: syn::Pat = content.parse()?;
+
+                let val = Ok(ValueArg::TagBits {
+                    bits_token,
+                    parens_token,
+                    count,
+                    comma_token,
+                    pattern,
+                });
+
+                // println!("TagBits: {:?}", val);
+
+                val
+            } else {
+                let val = Ok(ValueArg::Bits {
+                    bits_token,
+                    parens_token,
+                    count,
+                });
+
+                // println!("=== Bits ===: {:?}", val);
+
+                val
+            }
         } else {
             Err(lookahead.error())
         }
@@ -259,16 +299,28 @@ pub enum EffectArg {
         paren_token: syn::token::Paren,
         value: TagEither,
     },
+    Take {
+        take_token: kw::take,
+        paren_token: syn::token::Paren,
+        value: LitInt,
+    },
     Debug {
         debug_token: kw::debug,
         eq_token: Option<Token![=]>,
         value: Option<LitStr>,
     },
+    Call {
+        call_token: kw::call,
+        paren_token: syn::token::Paren,
+        value: syn::Path,
+    }
 }
 
 impl Parse for EffectArg {
     fn parse(input: ParseStream) -> SynResult<Self> {
         let lookahead = input.lookahead1();
+
+        // println!("+++ EffectArg Input: {}", input);
 
         if lookahead.peek(kw::tag) {
             let content;
@@ -282,6 +334,20 @@ impl Parse for EffectArg {
                 debug_token: input.parse()?,
                 eq_token: input.parse()?,
                 value: input.parse()?,
+            })
+        } else if lookahead.peek(kw::call) {
+            let content;
+            Ok(EffectArg::Call {
+                call_token: input.parse()?,
+                paren_token: parenthesized!(content in input),
+                value: content.parse()?,
+            })
+        } else if lookahead.peek(kw::take) {
+            let content;
+            Ok(EffectArg::Take {
+                take_token: input.parse()?,
+                paren_token: parenthesized!(content in input),
+                value: content.parse()?,
             })
         } else {
             Err(lookahead.error())
@@ -299,6 +365,12 @@ impl ToTokens for EffectArg {
             EffectArg::Debug { value, .. } => {
                 quote! { compile_error!("Debug is not yet implemented.") }
             }
+            EffectArg::Call { value, .. } => {
+                quote! { call!(#value) }
+            }
+            EffectArg::Take { value, .. } => {
+                quote!(take!(#value))
+            }
         };
 
         tokens.extend(repr);
@@ -313,6 +385,22 @@ pub fn pop_parens(input: ParseStream) -> SynResult<ParseBuffer> {
     let content;
     parenthesized!(content in input);
     Ok(content)
+}
+
+pub fn looking_at_match(lookahead: &Lookahead1) -> bool {
+    lookahead.peek(kw::range) || lookahead.peek(kw::val) || lookahead.peek(kw::values)
+}
+
+pub fn looking_at_parser(lookahead: &Lookahead1) -> bool {
+    lookahead.peek(kw::parser)
+        || lookahead.peek(kw::skip)
+        || lookahead.peek(kw::iter)
+        || lookahead.peek(kw::switch)
+        || lookahead.peek(kw::bits)
+}
+
+pub fn looking_at_effect(lookahead: &Lookahead1) -> bool {
+    lookahead.peek(kw::debug) || lookahead.peek(kw::tag) || lookahead.peek(kw::call) || lookahead.peek(kw::take)
 }
 
 mod kw {
@@ -331,9 +419,11 @@ mod kw {
     custom_keyword!(switch);
     custom_keyword!(parser);
     custom_keyword!(iter);
+    custom_keyword!(bits);
+    custom_keyword!(tag);
     // custom_keyword!(complete);
 
-    custom_keyword!(tag);
+    custom_keyword!(call);
     custom_keyword!(take);
     custom_keyword!(debug);
 }

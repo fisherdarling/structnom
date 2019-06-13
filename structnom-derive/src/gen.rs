@@ -60,7 +60,9 @@ impl EnumGen {
         for variant in self.data.variants.clone() {
             let parser = self.gen_variant_parser(variant);
 
-            parsers.push(parser);
+            if !parser.is_empty() {
+                parsers.push(parser);
+            }
         }
 
         let name = &self.name;
@@ -130,6 +132,11 @@ impl EnumGen {
         match value_arg {
             Some(ValueArg::Parser { value, .. }) => {
                 return quote_spanned!(variant_span=> #match_arm => call!(#value))
+            }
+            Some(ValueArg::Skip { .. }) => {
+                println!("Empty: {:#?}", quote_spanned!(variant_span=> ));
+
+                return quote_spanned!(variant_span=> )
             }
             Some(_) => {
                 return quote_spanned!(variant_span=> compile_error!("Unimplemented variant attribute."))
@@ -263,7 +270,7 @@ impl StructGen {
     pub fn gen_impl(&mut self) -> proc_macro2::TokenStream {
         let value_arg = self.args.iter().find_map(SnomArg::value_arg);
         let field_parser = match value_arg {
-            Some(ValueArg::Parser { value, .. }) => quote! { call!(value) },
+            Some(ValueArg::Parser { value, .. }) => quote! { call!(#value) },
             Some(_) => quote! { compile_error!("Unimplemented StructNom ValueArg for Struct, {:?}", self.name) },
             None => {
                 let field_gen = FieldsGen::new(&self.name, None, &self.data.fields);
@@ -334,10 +341,13 @@ impl<'a> FieldsGen<'a> {
             let value_arg = snom_args.iter().find_map(SnomArg::value_arg);
             let effect_args: Vec<_> = snom_args.iter().filter_map(SnomArg::effect_arg).collect();
 
+            // println!("*** EffectArgs Outer {:?}", effect_args);
+
+
             let field_ident = field.ident.clone().expect("Named Fields must be named");
             let ty = &field.ty;
 
-            println!("ValueArg: {:?}", value_arg);
+            // println!("ValueArg: {:?}", value_arg);
 
             let parser =
                 FieldsGen::gen_field_parser(&field_ident, ty, &value_arg, effect_args.as_slice());
@@ -365,13 +375,15 @@ impl<'a> FieldsGen<'a> {
                 .attrs
                 .iter()
                 .map(SnomArg::parse)
-                .flatten()
+                .map(|v| v.unwrap())
                 .flatten()
                 .collect();
 
             let _ = snom_args.iter().find_map(SnomArg::match_arg);
             let value_arg = snom_args.iter().find_map(SnomArg::value_arg);
             let effect_args: Vec<_> = snom_args.iter().filter_map(SnomArg::effect_arg).collect();
+
+            // println!("*** EffectArgs Outer {:?}", effect_args);
 
             let field_name = format!("f_{}", i);
             let field_ident = Ident::new(&field_name, field.ident.span());
@@ -409,11 +421,20 @@ impl<'a> FieldsGen<'a> {
             Some(ValueArg::Skip { .. }) => {
                 quote_spanned!(field_span=> #ident: value!(Default::default()) >>)
             }
+            Some(ValueArg::Bits { count, .. }) => {
+                    quote_spanned!(field_span=> #ident: bits!(take_bits!(#ty, #count)) >>)
+            }
+            Some(ValueArg::TagBits { count, pattern, .. }) => {
+                quote_spanned!(field_span=> #ident: bits!(tag_bits!(#ty, #count, #pattern)) >>)
+                
+            }
             Some(p) => {
                 let error = format!("Unimplemented field parser: {:?}", p);
                 quote_spanned!(field_span=> #ident: value!(compile_error!(#error)) >>)
             }
             None => {
+                // println!("Effect Args: {:?}", effect_args);
+
                 quote_spanned! {field_span=>
                     #(#effect_args >>)*
                     #ident: call!(<#ty>::nom) >>
@@ -426,7 +447,7 @@ impl<'a> FieldsGen<'a> {
         let args: Vec<_> = self.fields.iter().map(|f| f.attrs.as_slice()).flatten().map(SnomArg::parse).flatten().flatten().collect();
         let value_arg = args.iter().find_map(SnomArg::value_arg);
 
-        println!("UnitField ValueArgs: {:?}", value_arg);
+        // println!("UnitField ValueArgs: {:?}", value_arg);
 
         match value_arg {
             Some(ValueArg::Parser { value, ..}) => {
