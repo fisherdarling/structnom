@@ -40,7 +40,7 @@ pub fn nom_derive(input: TokenStream) -> TokenStream {
             let mut gen = StructGen::new(name, input.attrs, generics, data);
             let expanded = gen.gen_impl();
 
-            println!("{}", expanded);
+            // println!("{}", expanded);
 
             TokenStream::from(expanded)
         }
@@ -48,7 +48,7 @@ pub fn nom_derive(input: TokenStream) -> TokenStream {
             let mut generator = EnumGen::new(name.clone(), input.attrs, generics, data);
             let expanded = generator.gen_impl();
             
-            println!("{}", expanded);
+            // println!("{}", expanded);
 
             TokenStream::from(expanded)
         }

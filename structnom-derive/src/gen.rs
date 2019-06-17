@@ -43,7 +43,7 @@ impl EnumGen {
             .flatten()
             .collect();
 
-        println!("Enum Args: {:?}", args);
+        // println!("Enum Args: {:?}", args);
 
         EnumGen {
             name,
@@ -88,7 +88,7 @@ impl EnumGen {
     fn get_switch_func(&self) -> proc_macro2::TokenStream {
         let possible: Vec<&ValueArg> = self.args.iter().filter_map(SnomArg::value_arg).collect();
 
-        println!("Possible Attrs {:?}", possible);
+        // println!("Possible Attrs {:?}", possible);
 
         if let Some(ValueArg::Switch { value, .. }) = possible.get(0) {
             quote! { #value }
@@ -134,7 +134,7 @@ impl EnumGen {
                 return quote_spanned!(variant_span=> #match_arm => call!(#value))
             }
             Some(ValueArg::Skip { .. }) => {
-                println!("Empty: {:#?}", quote_spanned!(variant_span=> ));
+                // println!("Empty: {:#?}", quote_spanned!(variant_span=> ));
 
                 return quote_spanned!(variant_span=> )
             }
@@ -155,7 +155,7 @@ impl EnumGen {
     }
 
     fn handle_range(&mut self, range: &RangeArg) -> proc_macro2::TokenStream {
-        println!("Range State: {:?}, Range Arg: {:?}", self.state, range);
+        // println!("Range State: {:?}, Range Arg: {:?}", self.state, range);
 
         match range {
             RangeArg::Start { value, .. } => {
@@ -257,7 +257,7 @@ impl StructGen {
             .flatten()
             .collect();
 
-        println!("Struct Args: {:?}", args);
+        // println!("Struct Args: {:?}", args);
 
         StructGen {
             name,
@@ -564,7 +564,7 @@ mod tests {
 
         let enum_impl = gen.gen_impl();
 
-        println!("{}", enum_impl);
+        // println!("{}", enum_impl);
 
         panic!()
     }
@@ -581,7 +581,7 @@ mod tests {
         let mut gen = StructGen::new(name, attrs, generics, data);
         let struct_impl = gen.gen_impl();
 
-        println!("{}", struct_impl);
+        // println!("{}", struct_impl);
 
         panic!();
     }
