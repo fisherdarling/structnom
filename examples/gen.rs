@@ -1,34 +1,35 @@
 #![feature(specialization)]
 
-use structnom_derive::*;
+use structnom::*;
 
 // #[macro_use]
 // extern crate nom;
 
 use nom::*;
-
+use nom::number::complete::{le_u8, le_u32};
 
 generate_structnom!(little);
 
-// static SOME_SLICE: &[u8] = &[1, 2, 3, 4];
 
-// #[derive(StructNom)]
-// #[snom(switch = le_u8)]
-// pub enum Instr {
-//     #[snom(range(start = 1))]
-//     Nop, // 1
-//     If,  // 2
-//     #[snom(call(le_u32))]
-//     Add, // 3
-//     #[snom(range(skip))]
-//     Sub, // 5
-//     #[snom(range(skip = 3))]
-//     Skip3, // 9
-//     #[snom(range(end = 10))]
-//     Equal, // 10
-//     #[snom(val = 0x0F)]
-//     Another, // 15
-// }
+static SOME_SLICE: &[u8] = &[1, 2, 3, 4];
+
+#[derive(StructNom)]
+#[snom(switch = le_u8)]
+pub enum Instr {
+    #[snom(range(start = 1))]
+    Nop, // 1
+    If,  // 2
+    // #[snom(call(le_u32))]
+    Add, // 3
+    #[snom(range(skip))]
+    Sub, // 5
+    #[snom(range(skip = 3))]
+    Skip3, // 9
+    #[snom(range(end = 10))]
+    Equal, // 10
+    #[snom(val = 0x0F)]
+    Another, // 15
+}
 
 // #[derive(StructNom)]
 // pub struct Example<T: StructNom> {

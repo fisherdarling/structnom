@@ -49,7 +49,7 @@ macro_rules! numeric_impl {
             let expanded = quote! {
                 impl StructNom for $ty1 {
                     fn nom(input: &[u8]) -> nom::IResult<&[u8], Self> {
-                        let (input, res) = nom::#func_a(input)?;
+                        let (input, res) = nom::number::complete::#func_a(input)?;
 
                         Ok((input, res))
                     }
@@ -57,7 +57,7 @@ macro_rules! numeric_impl {
 
                 impl StructNom for $ty2 {
                     fn nom(input: &[u8]) -> nom::IResult<&[u8], Self> {
-                        let (input, res) = nom::#func_b(input)?;
+                        let (input, res) = nom::number::complete::#func_b(input)?;
 
                         Ok((input, res))
                     }
@@ -81,7 +81,7 @@ pub fn gen_vec_impl(endian: Endian) -> proc_macro2::TokenStream {
     let expanded = quote! {
         impl<T: StructNom> StructNom for Vec<T> {
             default fn nom(input: &[u8]) -> nom::IResult<&[u8], Self> {
-                let (input, length) = nom::#func(input)?;
+                let (input, length) = nom::number::complete::#func(input)?;
 
                 // log::debug!("Vec Length: {}", length);
 
@@ -99,7 +99,7 @@ pub fn gen_option_impl() -> proc_macro2::TokenStream {
     let expanded = quote! {
         impl<T: StructNom> StructNom for Option<T> {
             default fn nom(input: &[u8]) -> nom::IResult<&[u8], Self> {
-                let (input, res) = opt!(input, T::nom)?;
+                let (input, res) = nom::opt!(input, T::nom)?;
 
                 Ok((input, res))
             }
