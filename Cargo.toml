@@ -21,3 +21,5 @@ syn = { version = "*", features = ["derive", "extra-traits", "full"] }
 quote = "*"
 proc-macro2 = "*"
 log = "*"
+serde = { version = "*", features = ["derive"] }
+toml = "*"
