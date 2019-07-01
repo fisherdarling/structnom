@@ -6,7 +6,7 @@ use structnom::*;
 // extern crate nom;
 
 use nom::*;
-use nom::number::complete::{le_u8, le_u32};
+use nom::{le_u8, le_u32};
 
 generate_structnom!(little);
 

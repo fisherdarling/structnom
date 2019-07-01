@@ -16,7 +16,7 @@ name = "ipv4"
 path = "./examples/ipv4header.rs"
 
 [dependencies]
-nom = "*"
+nom = "4.2.3"
 syn = { version = "*", features = ["derive", "extra-traits", "full"] }
 quote = "*"
 proc-macro2 = "*"
