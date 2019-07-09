@@ -10,17 +10,21 @@ use quote::{quote, ToTokens};
 use syn::{
     parse2, parse_macro_input, AttrStyle, Attribute, Data, DataEnum, DataStruct, DeriveInput,
     Field, Fields, FieldsNamed, FieldsUnnamed, Generics, Ident, Lit, LitInt, Meta, MetaList,
-    MetaNameValue, NestedMeta, Variant, Span,
+    MetaNameValue, NestedMeta, Variant,
 };
+
+use proc_macro2::Span;
 
 use proc_macro2::TokenTree;
 
-use serde::{Serialize, Deserialize};
-use std::fmt;
+use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
+use std::fmt;
+
+mod attrs;
 
 /// generate_structnom!(r#"
-///     endian = native, little, big 
+///     endian = native, little, big
 ///     streaming = true, false, both
 ///     iterating = true, false, both    
 ///     verbose-errors = true, false
@@ -31,11 +35,11 @@ use std::borrow::Borrow;
 ///     }
 ///     string-style = {
 ///         IsVector,
-///         length = endian_u8, fn -> Integer 
-///         terminal = None, &[u8] 
-///         included = false, true 
+///         length = endian_u8, fn -> Integer
+///         terminal = None, &[u8]
+///         included = false, true
 ///     }
-/// 
+///
 ///     // primitive numeric types are in the form:
 ///     // {type}-parser = fn -> Integer
 ///     // They default to endian_{type}
@@ -45,23 +49,60 @@ struct Unit;
 
 mod trait_gen;
 
+// TraitConfig {
+//     endian: { Native, Little, Big },
+//     streaming: { true, false, both },
+//     iterating: { true, false, both },
+//     verbose-errors = { true, false },
+//     vector-style = VectorStyle {
+//         length = Option<"path">,
+//         terminal = Option<&[u8]>,
+//         included = { false, true },
+//     },
+//     string-style = StringStyle {
+//         IsVector,
+//         Style {
+//             length = Option<"path">,
+//             terminal = Option<&[u8]>,
+//             included = false, true
+//         }
+//     }
+// }
 
 #[proc_macro_derive(StructNom, attributes(snom))]
 pub fn structnom_derive(input: TokenStream) -> TokenStream {
-    input
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let fields = match input.data {
+        syn::Data::Struct(DataStruct {
+            fields: Fields::Named(ref f),
+            ..
+        }) => f,
+        _ => panic!("EnumMessage only works on Enums"),
+    };
+
+    for field in &fields.named {
+        let config = attrs::Field::from_field(field);
+    }
+
+    // println!("=====================================");
+    println!("{:?}", fields);
+
+    let expanded = quote! {};
+
+    expanded.into()
 }
 
 pub(crate) trait Generate {
     fn generate(&mut self) -> proc_macro2::TokenStream;
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum Endian {
     Little,
     Big,
 }
-
 
 impl Default for Endian {
     #[cfg(target_endian = "little")]
@@ -103,12 +144,6 @@ impl Endian {
         } else {
             Span::call_site()
         };
-        
-        
         unimplemented!()
     }
 }
-
-
-
-

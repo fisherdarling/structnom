@@ -11,12 +11,8 @@ proc-macro = true
 name = "gen"
 path = "./examples/gen.rs"
 
-[[example]]
-name = "ipv4"
-path = "./examples/ipv4header.rs"
-
 [dependencies]
-nom = "*"
+nom = "5"
 syn = { version = "*", features = ["derive", "extra-traits", "full"] }
 quote = "*"
 proc-macro2 = "*"
