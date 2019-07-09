@@ -72,27 +72,61 @@ mod trait_gen;
 #[proc_macro_derive(StructNom, attributes(snom))]
 pub fn structnom_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
+    
+    let container = attrs::Container::from_input(&input);
+
+    println!("Container: {:?}", container);
+    
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-    let fields = match input.data {
+    
+    match input.data {
         syn::Data::Struct(DataStruct {
             fields: Fields::Named(ref f),
             ..
-        }) => f,
-        _ => panic!("EnumMessage only works on Enums"),
+        }) => gen_fields_named(&f),
+        syn::Data::Struct(DataStruct {
+            fields: Fields::Unnamed(ref f),
+            ..
+        }) => gen_fields_unnamed(&f),
+        syn::Data::Enum(DataEnum {
+            variants,
+            ..
+        }) => gen_variants(variants.iter().collect()),
+        _ => panic!("Only works on named struct fields"),
     };
-
-    for field in &fields.named {
-        let config = attrs::Field::from_field(field);
-    }
-
-    // println!("=====================================");
-    println!("{:?}", fields);
 
     let expanded = quote! {};
 
     expanded.into()
 }
+
+
+fn gen_fields_named(fields: &FieldsNamed) {
+    for field in &fields.named {
+        let config = attrs::Field::from_field(field);
+        println!("Config: {:?}", config);
+    }
+}
+
+fn gen_fields_unnamed(fields: &FieldsUnnamed) {
+    for field in &fields.unnamed {
+        let config = attrs::Field::from_field(field);
+        println!("Config: {:?}", config);
+    }
+}
+
+fn gen_variants(variants: Vec<&Variant>) {
+    for variant in variants {
+        let config = attrs::Variant::from_variant(variant);
+        println!("Config: {:?}", config);
+    }
+}
+
+
+
+
+
 
 pub(crate) trait Generate {
     fn generate(&mut self) -> proc_macro2::TokenStream;
@@ -131,11 +165,11 @@ impl Endian {
     }
 
     pub fn little() -> Self {
-        Endian::little()
+        Endian::Little
     }
 
     pub fn big() -> Self {
-        Endian::big()
+        Endian::Big
     }
 
     pub fn prefix<S: Borrow<str>>(suffix: S, span: Option<Span>) -> Ident {
