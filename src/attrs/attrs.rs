@@ -56,13 +56,13 @@ impl Container {
                     // #[snom(parser = "path::to::parser")]
                     Meta(NameValue(ref m)) if m.ident == "parser" => {
                         let path = attrs::get_expr_path(&m.lit).unwrap();
-                        println!("parser = \"{}\"", quote!(#path));
+                        // println!("parser = \"{}\"", quote!(#path));
                         container.parser.replace(path);
                     }
                     // #[snom(switch = "path::to::switch")]
                     Meta(NameValue(ref m)) if m.ident == "switch" => {
                         let path = attrs::get_expr_path(&m.lit).unwrap();
-                        println!("parser = \"{}\"", quote!(#path));
+                        // println!("parser = \"{}\"", quote!(#path));
                         container.switch.replace(path);
                     }
                     // #[snom(parser = "path::to::parser")]
@@ -102,18 +102,18 @@ impl Field {
                     // #[snom(parser = "path::to::parser")]
                     Meta(NameValue(ref m)) if m.ident == "parser" => {
                         let path = attrs::get_expr_path(&m.lit).unwrap();
-                        println!("parser = \"{}\"", quote!(#path));
+                        // println!("parser = \"{}\"", quote!(#path));
                         field.parser.replace(path);
                     }
                     // #[snom(skip)]
                     Meta(Word(ref i)) if i == "skip" => {
-                        println!("skip");
+                        // println!("skip");
                         field.skip = true;
                     }
                     // #[snom(take(4))]
                     Meta(List(ref l)) if l.ident == "take" => {
                         if let Some(Literal(Lit::Int(lit))) = l.nested.iter().next() {
-                            println!("take({})", quote!(#lit));
+                            // println!("take({})", quote!(#lit));
                             field.take.replace(lit.clone());
                         } else {
                             panic!()
@@ -143,7 +143,7 @@ impl Field {
                     // #[snom(call = "path::to::call")]
                     Meta(NameValue(ref m)) if m.ident == "call" => {
                         let path = attrs::get_expr_path(&m.lit).unwrap();
-                        println!("call = \"{}\"", quote!(#path));
+                        // println!("call = \"{}\"", quote!(#path));
                         field.call.get_or_insert(Vec::new()).push(path);
                     }
                     _ => panic!(),
@@ -170,7 +170,8 @@ impl Variant {
 
         for nested_meta in ast.attrs.iter().filter_map(get_snom_metas) {
             for meta in nested_meta {
-                println!("Meta ======== ============ \n{:?}\n\n", nested_meta);
+                // println!("Meta: {:?}", meta);
+                // println!("Meta ======== ============ \n{:?}\n\n", nested_meta);
                 match meta {
                     // #[snom(val = x30)]
                     Meta(NameValue(ref m)) if m.ident == "val" => {
@@ -178,13 +179,13 @@ impl Variant {
                     }
                     // #[snom(skip)]
                     Meta(Word(ref i)) if i == "skip" => {
-                        println!("skip");
+                        // println!("skip");
                         variant.skip = true;
                     }
                     // #[snom(take(4))]
                     Meta(List(ref l)) if l.ident == "take" => {
                         if let Some(Literal(Lit::Int(lit))) = l.nested.iter().next() {
-                            println!("take({})", quote!(#lit));
+                            // println!("take({})", quote!(#lit));
                             variant.take.replace(lit.clone());
                         } else {
                             panic!()
@@ -193,7 +194,7 @@ impl Variant {
                     // #[snom(call = "path::to::call")]
                     Meta(NameValue(ref m)) if m.ident == "call" => {
                         let path = attrs::get_expr_path(&m.lit).unwrap();
-                        println!("call = \"{}\"", quote!(#path));
+                        // println!("call = \"{}\"", quote!(#path));
                         variant.call.get_or_insert(Vec::new()).push(path);
                     }
                     // #[snom(range(start = lit_int))]
@@ -221,6 +222,8 @@ impl Variant {
                             }
                             _ => panic!()
                         };
+
+                        variant.range.replace(range);
                     }
                     _ => panic!(),
                 }
