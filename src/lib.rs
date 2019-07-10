@@ -22,6 +22,7 @@ use std::borrow::Borrow;
 use std::fmt;
 
 mod attrs;
+mod fields;
 
 /// generate_structnom!(r#"
 ///     endian = native, little, big
@@ -72,14 +73,11 @@ mod trait_gen;
 #[proc_macro_derive(StructNom, attributes(snom))]
 pub fn structnom_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    
     let container = attrs::Container::from_input(&input);
 
     println!("Container: {:?}", container);
-    
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-    
     match input.data {
         syn::Data::Struct(DataStruct {
             fields: Fields::Named(ref f),
@@ -89,10 +87,7 @@ pub fn structnom_derive(input: TokenStream) -> TokenStream {
             fields: Fields::Unnamed(ref f),
             ..
         }) => gen_fields_unnamed(&f),
-        syn::Data::Enum(DataEnum {
-            variants,
-            ..
-        }) => gen_variants(variants.iter().collect()),
+        syn::Data::Enum(DataEnum { variants, .. }) => gen_variants(variants.iter().collect()),
         _ => panic!("Only works on named struct fields"),
     };
 
@@ -100,7 +95,6 @@ pub fn structnom_derive(input: TokenStream) -> TokenStream {
 
     expanded.into()
 }
-
 
 fn gen_fields_named(fields: &FieldsNamed) {
     for field in &fields.named {
@@ -122,11 +116,6 @@ fn gen_variants(variants: Vec<&Variant>) {
         println!("Config: {:?}", config);
     }
 }
-
-
-
-
-
 
 pub(crate) trait Generate {
     fn generate(&mut self) -> proc_macro2::TokenStream;
