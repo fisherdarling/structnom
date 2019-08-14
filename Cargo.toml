@@ -12,7 +12,7 @@ name = "gen"
 path = "./examples/gen.rs"
 
 [dependencies]
-nom = "5"
+nom = "^5"
 syn = { version = "*", features = ["derive", "extra-traits", "full"] }
 quote = "*"
 proc-macro2 = "*"

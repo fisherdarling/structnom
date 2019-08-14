@@ -1,5 +1,25 @@
 use structnom::StructNom;
 
+use nom::number::complete::{le_u8, le_u32};
+use nom::{do_parse, IResult};
+
+pub struct BitTaker {
+    // #[snom(bits(3))]
+    first: u8,
+    // #[snom(bits(4, 0x0A))]
+    second: u32,
+}
+
+// fn parse_taker(input: &[u8]) -> IResult<BitTaker, nom::Err> {
+//     do_parse!(
+//         input,
+//         first: le_u8 >>
+//         second: le_u32 >>
+//         (BitTaker { first, second })
+//     )
+// }
+
+
 // static SOME_SLICE: &[u8] = &[1, 2, 3, 4];
 
 
@@ -14,12 +34,7 @@ use structnom::StructNom;
 // }
 
 // #[derive(StructNom)]
-// pub struct BitTaker {
-//     #[snom(bits(3))]
-//     first: u8,
-//     #[snom(bits(4, 0x0A))]
-//     second: u32,
-// }
+
 
 // #[derive(StructNom)]
 // #[snom(parser = "crate::mystruct_parser")]

@@ -1,4 +1,5 @@
 use syn::{Fields, FieldsNamed, FieldsUnnamed, Ident};
+use proc_macro2::{TokenStream, TokenTree};
 
 use quote::quote;
 
@@ -31,15 +32,44 @@ impl<'a> FieldsGen<'a> {
         field_parser
     }
 
+    // #[derive(Default, Debug, Clone, PartialEq, Eq)]
+    // pub struct Field {
+    //     pub parser: Option<ExprPath>,
+    //     pub skip: bool,
+    //     pub take: Option<LitInt>,
+    //     pub bits: Option<Bits>,
+    //     pub call: Option<Vec<ExprPath>>,
+    //     // debug: bool
+    // }
+
     fn gen_named_parser(&self, fields: &FieldsNamed) -> proc_macro2::TokenStream {
+        // let mut field_parsers = Vec::new();
         let mut idents = Vec::new();
-        let mut parsers = Vec::new();
 
         for field in fields.named.iter() {
             let config: attrs::Field = attrs::Field::from_field(field);
 
-            
+            if config.skip {
+                continue;
+            }
 
+            let mut field_parse_tokens = TokenStream::new();
+
+            if let Some(ref calls) = config.call {
+                for call in calls {
+                    field_parse_tokens.extend(quote! {
+                        #call >>
+                    });
+                }
+            }
+
+            if let Some(ref parser) = config.take {
+                
+            }
+
+
+            println!("{:?}", config);
+            idents.push(field.ident.clone().expect("FieldsNamed must have an ident."));
         }
 
         let name = self.gen_name();
