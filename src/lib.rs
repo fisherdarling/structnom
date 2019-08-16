@@ -23,6 +23,7 @@ use std::fmt;
 
 mod attrs;
 mod fields;
+mod config;
 
 use crate::fields::FieldsGen;
 
