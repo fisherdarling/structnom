@@ -1,9 +1,9 @@
-use syn::{Fields, FieldsNamed, FieldsUnnamed, Ident};
 use proc_macro2::{TokenStream, TokenTree};
+use syn::{Fields, FieldsNamed, FieldsUnnamed, Ident};
 
 use quote::quote;
 
-use crate::attrs;
+use crate::attrs::{self, Bits};
 
 #[derive(Debug, Clone)]
 pub struct FieldsGen<'a> {
@@ -43,10 +43,13 @@ impl<'a> FieldsGen<'a> {
     // }
 
     fn gen_named_parser(&self, fields: &FieldsNamed) -> proc_macro2::TokenStream {
-        // let mut field_parsers = Vec::new();
+        let mut field_parsers = Vec::new();
         let mut idents = Vec::new();
+        
 
         for field in fields.named.iter() {
+            // dbg!(field);
+
             let config: attrs::Field = attrs::Field::from_field(field);
 
             if config.skip {
@@ -58,18 +61,49 @@ impl<'a> FieldsGen<'a> {
             if let Some(ref calls) = config.call {
                 for call in calls {
                     field_parse_tokens.extend(quote! {
-                        #call >>
+                        let (input, _) = #call(input)?;
                     });
                 }
             }
 
-            if let Some(ref parser) = config.take {
-                
+            if let Some(ref parser) = config.parser {
+                field_parse_tokens.extend(quote! {
+                    let (input, value) = #parser(input);
+                })
+            } else if let Some(ref parser) = config.take {
+                unimplemented!();
+            } else if let Some(ref bits) = config.bits {
+                match bits {
+                    _ => unimplemented!()
+                    // Bits::
+                }
+            } else {
+                let field_type = &field.ty;
+                field_parse_tokens.extend(quote! {
+                    #field_type::parse_slice(input)?
+                })
             }
+            // println!("=[TOKENS]=\n{}", field_parse_tokens);
 
+            let field_name = field.ident.as_ref().expect("Named fields must have a name");
 
-            println!("{:?}", config);
-            idents.push(field.ident.clone().expect("FieldsNamed must have an ident."));
+            let final_parser = quote! {
+                let (input, #field_name) = {
+                    #field_parse_tokens
+                };
+            };
+
+            println!("{}", final_parser);
+
+            idents.push(field_name);
+            field_parsers.push(final_parser);
+
+            // idents.push(
+            //     field
+            //         .ident
+            //         .clone()
+            //         .expect("FieldsNamed must have an ident."),
+            // );
         }
 
         let name = self.gen_name();

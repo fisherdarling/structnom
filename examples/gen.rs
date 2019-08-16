@@ -1,27 +1,35 @@
 use structnom::StructNom;
 
-use nom::number::complete::{le_u8, le_u32};
+use nom::number::complete::{le_u32, le_u8};
 use nom::{do_parse, IResult};
+use nom::error::VerboseError;
 
+#[derive(StructNom)]
 pub struct BitTaker {
-    // #[snom(bits(3))]
+    #[snom(call = "a::func::to::call")]
     first: u8,
     // #[snom(bits(4, 0x0A))]
-    second: u32,
+    // second: u32,
 }
 
-// fn parse_taker(input: &[u8]) -> IResult<BitTaker, nom::Err> {
+// impl StructNom for BitTaker {
+//     fn parse_slice(input: &[u8]) -> IResult<&[u8], Self> {
+//         let (rest, first) = le_u8(input)?;
+//         let value = BitTaker { first };
+//         Ok((rest, value))
+//     }
+// }
+
+// fn parse_taker(input: &[u8]) -> IResult<&[u8], BitTaker> {
 //     do_parse!(
 //         input,
 //         first: le_u8 >>
-//         second: le_u32 >>
-//         (BitTaker { first, second })
+//         // second: le_u32 >>
+//         (BitTaker { first })
 //     )
 // }
 
-
 // static SOME_SLICE: &[u8] = &[1, 2, 3, 4];
-
 
 // #[derive(StructNom)]
 // pub struct Example<T: StructNom> {
@@ -34,7 +42,6 @@ pub struct BitTaker {
 // }
 
 // #[derive(StructNom)]
-
 
 // #[derive(StructNom)]
 // #[snom(parser = "crate::mystruct_parser")]

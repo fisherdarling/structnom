@@ -1,4 +1,6 @@
 use quote::quote;
+
+use crate::Endian;
 // use proc_macro2;
 
 /// generate_structnom!(r#"
@@ -50,3 +52,4 @@ pub struct Unit;
 //         quote!()
 //     }
 // }
+

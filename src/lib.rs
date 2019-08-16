@@ -24,6 +24,8 @@ use std::fmt;
 mod attrs;
 mod fields;
 
+use crate::fields::FieldsGen;
+
 /// generate_structnom!(r#"
 ///     endian = native, little, big
 ///     streaming = true, false, both
@@ -80,9 +82,12 @@ pub fn structnom_derive(input: TokenStream) -> TokenStream {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     match input.data {
         syn::Data::Struct(DataStruct {
-            fields: Fields::Named(ref f),
+            ref fields,
             ..
-        }) => gen_fields_named(&f),
+        }) => {
+            let mut field_gen = FieldsGen::new(name, None, fields);
+            field_gen.gen_parser();
+        },
         syn::Data::Struct(DataStruct {
             fields: Fields::Unnamed(ref f),
             ..
@@ -96,12 +101,12 @@ pub fn structnom_derive(input: TokenStream) -> TokenStream {
     expanded.into()
 }
 
-fn gen_fields_named(fields: &FieldsNamed) {
-    for field in &fields.named {
-        let config = attrs::Field::from_field(field);
-        println!("Config: {:?}", config);
-    }
-}
+// fn gen_fields_named(fields: &FieldsNamed) {
+//     for field in &fields.named {
+//         let config = attrs::Field::from_field(field);
+//         println!("Config: {:?}", config);
+//     }
+// }
 
 fn gen_fields_unnamed(fields: &FieldsUnnamed) {
     for field in &fields.unnamed {
